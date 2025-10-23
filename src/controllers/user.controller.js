@@ -2,7 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/apiError.js'
 import { apiResponse } from '../utils/apiResponse.js'
 import { User } from '../models/user.model.js'
-import { uploadOnCloudinary } from '../utils/cloudinary.js'
+import { deleteFromCloudinary, uploadOnCloudinary } from '../utils/cloudinary.js'
 import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
 
@@ -72,8 +72,14 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const user = await User.create({
         fullName,
-        avatar: avatar.url,
-        coverImage: coverImage?.url || "",
+        avatar: {
+            url: avatar.url,
+            publicId: avatar.public_id
+        },
+        coverImage: {
+            url: coverImage?.url || "",
+            publicId: coverImage?.public_id || ""
+        },
         email,
         password,
         username: username.toLowerCase()
@@ -156,8 +162,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
         {
-            $set: {
-                refreshToken: undefined
+            $unset: {
+                refreshToken: 1
             }
         },
         {
@@ -277,7 +283,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
         )
 })
 
-//TODO: delete old img from cloudinary after update
+// delete old img from cloudinary after update 
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
@@ -290,6 +296,13 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     if (!avatar.url) {
         throw new ApiError(400, "Error while uploading avatar")
+    }
+
+    const deleteOldAvatar = await deleteFromCloudinary(req.user?.avatar?.publicId)
+
+    if (!deleteOldAvatar || deleteOldAvatar.result !== "ok") {
+        await deleteFromCloudinary(avatar.public_id); //rollback new avatar upload
+        throw new ApiError(500, "Failed to delete old avatar. Rolled back new upload.")
     }
 
     const user = await User.findByIdAndUpdate(
@@ -320,6 +333,13 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
     if (!coverImage.url) {
         throw new ApiError(400, "Error while uploading cover image")
+    }
+
+    const deleteOldCoverImage = await deleteFromCloudinary(req.user?.coverImage?.publicId)
+
+    if (!deleteOldCoverImage || deleteOldCoverImage.result !== "ok") {
+        await deleteFromCloudinary(coverImage.public_id); //rollback new coverImage upload
+        throw new ApiError(500, "Failed to delete old cover image. Rolled back new upload.")
     }
 
     const user = await User.findByIdAndUpdate(
@@ -377,8 +397,8 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
                     $size: "$subscribedTo"
                 },
                 isSubscribed: {
-                    $cond : {
-                        if: { $in: [req.user?._id, "$subscribers.subscriber"]},
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
                         then: true,
                         else: false
                     }
@@ -404,10 +424,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     }
 
     return res
-    .status(200)
-    .json(
-        new apiResponse(200, channel[0], "User channel fetched successfully")
-    )
+        .status(200)
+        .json(
+            new apiResponse(200, channel[0], "User channel fetched successfully")
+        )
 })
 
 const getWatchHistory = asyncHandler(async (req, res) => {
@@ -454,10 +474,10 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     ])
 
     return res
-    .status(200)
-    .json(
-        new apiResponse(200, user[0].watchHistory, "Watch history fetched successfully")
-    )
+        .status(200)
+        .json(
+            new apiResponse(200, user[0].watchHistory, "Watch history fetched successfully")
+        )
 })
 
 export {
