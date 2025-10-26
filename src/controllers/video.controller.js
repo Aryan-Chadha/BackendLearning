@@ -26,7 +26,7 @@ const getAllvideos = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: 'User',
+                from: 'users',
                 localField: 'owner',
                 foreignField: '_id',
                 as: 'owner',
@@ -138,7 +138,7 @@ const getVideoById = asyncHandler(async (req, res) => {
         },
         {
             $lookup: {
-                from: "User",
+                from: "users",
                 localField: "owner",
                 foreignField: "_id",
                 as: "owner",
@@ -181,10 +181,15 @@ const updateVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400, "At least one field is required for updation")
     }
 
-    const videoDetails = await Video.findById(videoId)
+
 
     let thumbnail;
     if (thumbnailLocalPath) {
+        const videoDetails = await Video.findById(videoId)
+
+        if (!videoDetails) {
+            throw new ApiError(404,"video not found")
+        }
         thumbnail = await uploadOnCloudinary(thumbnailLocalPath)
 
         if (!thumbnail.url) {
@@ -215,6 +220,10 @@ const updateVideo = asyncHandler(async (req, res) => {
         },
         { new: true }
     )
+
+    if (!video) {
+        throw new ApiError(500,"Error while updating in DB")
+    }
 
     return res
         .status(200)
