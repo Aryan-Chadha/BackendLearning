@@ -20,7 +20,7 @@ const getAllvideos = asyncHandler(async (req, res) => {
         match.owner = userId
     }
 
-    const aggregation = Video.aggregate([
+    const aggregation = await Video.aggregate([
         {
             $match: match
         },
@@ -155,6 +155,12 @@ const getVideoById = asyncHandler(async (req, res) => {
         },
         {
             $unwind: "$owner"
+        },
+        {
+            $project: {
+                videoFile: 0,
+                description: 0
+            }
         }
     ])
 
@@ -166,6 +172,39 @@ const getVideoById = asyncHandler(async (req, res) => {
         .status(200)
         .json(
             new apiResponse(200, video[0], "Video fetched successfully")
+        )
+
+})
+
+const watchVideo = asyncHandler(async (req, res) => {
+    const { videoId } = req.params
+    //TODO: get video by id
+    if (!videoId.trim()) {
+        throw new ApiError(400, "video reference is required")
+    }
+
+    const video = await Video.findByIdAndUpdate(
+        videoId,
+        {
+            $inc: {
+                views: 1
+            }
+        },
+        { new: true }
+    )
+        .populate({
+            path: "owner",
+            select: "_id username avatar"
+        })
+
+    if (!video) {
+        throw new ApiError(500, "Video doesn't exist")
+    }
+
+    return res
+        .status(200)
+        .json(
+            new apiResponse(200, video, "Video fetched successfully")
         )
 
 })
@@ -188,7 +227,7 @@ const updateVideo = asyncHandler(async (req, res) => {
         const videoDetails = await Video.findById(videoId)
 
         if (!videoDetails) {
-            throw new ApiError(404,"video not found")
+            throw new ApiError(404, "video not found")
         }
         thumbnail = await uploadOnCloudinary(thumbnailLocalPath)
 
@@ -222,7 +261,7 @@ const updateVideo = asyncHandler(async (req, res) => {
     )
 
     if (!video) {
-        throw new ApiError(500,"Error while updating in DB")
+        throw new ApiError(500, "Error while updating in DB")
     }
 
     return res
@@ -284,5 +323,6 @@ export {
     getVideoById,
     updateVideo,
     deleteVideo,
-    togglePublishStatus
+    togglePublishStatus,
+    watchVideo
 }

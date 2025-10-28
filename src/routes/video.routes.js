@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { deleteVideo, getAllvideos, getVideoById, publishAVideo, togglePublishStatus, updateVideo } from "../controllers/video.controller.js";
+import { deleteVideo, getAllvideos, getVideoById, publishAVideo, togglePublishStatus, updateVideo, watchVideo } from "../controllers/video.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 
@@ -21,6 +21,8 @@ router
     ]),
         publishAVideo
     )
+
+router.route("/watch/:videoId").patch(watchVideo)    
 
 router
     .route("/:videoId")

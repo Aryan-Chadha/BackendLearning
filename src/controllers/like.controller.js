@@ -179,6 +179,11 @@ const getLikedVideos = asyncHandler(async (req, res) => {
                     },
                     {
                         $unwind:"$owner"
+                    },
+                    {
+                        $project:{
+                            videoFile:0
+                        }
                     }
                 ]
             }
@@ -203,7 +208,9 @@ const getLikedVideos = asyncHandler(async (req, res) => {
         }
     ])
 
-    
+    if (!videos.length) {
+        return res.status(200).json(200,videos,"No liked videos found")
+    }    
 
     return res
     .status(200)
